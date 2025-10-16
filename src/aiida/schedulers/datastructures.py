@@ -372,7 +372,7 @@ class JobTemplate(DefaultFieldsAttributeDict):
         'account',
         'qos',
         'job_resource',
-        'parent_job_resource',
+        'persistent_job_resource',
         'priority',
         'max_memory_kb',
         'max_wallclock_seconds',
@@ -402,7 +402,7 @@ class JobTemplate(DefaultFieldsAttributeDict):
         account: str
         qos: str
         job_resource: JobResource
-        parent_job_resource: JobResource
+        persistent_job_resource: JobResource
         priority: str
         max_memory_kb: int | None
         max_wallclock_seconds: int

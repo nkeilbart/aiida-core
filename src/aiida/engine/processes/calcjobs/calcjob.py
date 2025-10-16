@@ -323,10 +323,10 @@ class CalcJob(Process):
             'scheduler for more details.',
         )
         spec.input(
-            'metadata.options.parent_resources',
+            'metadata.options.persistent_resources',
             valid_type=dict,
             required=True,
-            help='Set the dictionary of resources to set for the parent allocation by the scheduler plugin, '
+            help='Set the dictionary of resources to set for the persistent allocation by the scheduler plugin, '
             'like the number of nodes, cpus etc. This dictionary is scheduler-plugin dependent. This is meant for '
             'next generation schedulers that allow for persistent allocations. Look at the documentation of the '
             'scheduler for more details.',
@@ -1000,10 +1000,10 @@ class CalcJob(Process):
         scheduler.preprocess_resources(resources or {}, computer.get_default_mpiprocs_per_machine())
         job_tmpl.job_resource = scheduler.create_job_resource(**resources)  # type: ignore[arg-type]
 
-        # Set parent resources
-        parent_resources = self.node.get_option('parent_resources')
-        scheduler.preprocess_resources(parent_resources or {}, computer.get_default_mpiprocs_per_machine())
-        job_tmpl.parent_job_resource = scheduler.create_job_resource(**parent_resources)
+        # Set persistent resources
+        persistent_resources = self.node.get_option('persistent_resources')
+        scheduler.preprocess_resources(persistent_resources or {}, computer.get_default_mpiprocs_per_machine())
+        job_tmpl.persistent_job_resource = scheduler.create_job_resource(**persistent_resources)
 
         subst_dict = {'tot_num_mpiprocs': job_tmpl.job_resource.get_tot_num_mpiprocs()}
 
