@@ -28,6 +28,8 @@ class PsqlConfig(TypedDict, total=False):
     database_password: str
     database_name: str
 
+    pool_pre_ping: bool
+
     engine_kwargs: dict[str, Any]
     """keyword argument that will be passed on to the SQLAlchemy engine."""
 
@@ -57,11 +59,14 @@ def create_sqlalchemy_engine(config: PsqlConfig) -> Engine:
         port=config['database_port'],
         name=config['database_name'],
     )
+    engine_kwargs = config.get('engine_kwargs', {}).copy()
+    engine_kwargs.setdefault('pool_pre_ping', config.get('pool_pre_ping', False))
+
     return create_engine(
         engine_url,
         json_serializer=json.dumps,
         json_deserializer=json.loads,
-        **config.get('engine_kwargs', {}),
+        **engine_kwargs,
     )
 
 

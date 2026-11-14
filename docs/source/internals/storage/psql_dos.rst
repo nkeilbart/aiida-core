@@ -14,6 +14,11 @@ Larger binary data (such as input/output file content), required for nodes, are 
 
 Interfacing with the database is achieved using the `sqlalchemy <https://www.sqlalchemy.org/>`_ ORM API.
 
+The PostgreSQL engine can be configured to validate pooled connections on checkout by setting
+``storage.config.pool_pre_ping: true`` in the profile configuration. This replaces stale idle connections before use,
+but cannot recover a connection failure that occurs during an active query or transaction. The option is disabled by
+default.
+
 
 The PostgreSQL database schema
 ==============================
