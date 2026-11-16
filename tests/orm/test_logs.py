@@ -240,6 +240,24 @@ class TestBackendLog:
         assert logs[0].message == message
         assert logs[1].message == message2
 
+    def test_db_log_handler_does_not_raise_on_storage_failure(self, monkeypatch, capsys):
+        """A database outage while storing a log should not escape the logging call."""
+        from aiida.orm.utils.log import DBLogHandler
+
+        handler = DBLogHandler()
+        record = logging.LogRecord('aiida', logging.ERROR, __file__, 1, 'failure', (), None)
+        record.backend = object()
+
+        class Collection:
+            def create_entry_from_record(self, record):
+                raise RuntimeError('database unavailable')
+
+        monkeypatch.setattr(Log, 'get_collection', lambda backend: Collection())
+
+        handler.emit(record)
+
+        assert 'database unavailable' in capsys.readouterr().err
+
     def test_log_querybuilder(self):
         """Test querying for logs by joining on nodes in the QueryBuilder"""
         from aiida.orm import QueryBuilder

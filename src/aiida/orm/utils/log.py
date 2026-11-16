@@ -39,12 +39,10 @@ class DBLogHandler(logging.Handler):
                 pass
 
         except Exception:
-            # To avoid loops with the error handler, I just print.
-            # Hopefully, though, this should not happen!
+            # Avoid recursively logging the handler failure, and do not mask the original log call.
             import traceback
 
             traceback.print_exc()
-            raise
 
 
 def get_dblogger_extra(node):
