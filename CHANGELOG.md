@@ -10,10 +10,6 @@
 
 - Allow PostgreSQL profiles to enable SQLAlchemy ``pool_pre_ping`` to replace stale pooled connections on checkout.
 
-### Fixes
-
-- Do not let failures while writing ORM log records mask the original application failure.
-
 ## v2.9.4 - 2026-10-22
 
 This patch fixes `CalcJob` upload and retrieval robustness after partial transfers and restarts, and relaxes the type of the `structurelist` argument of `TrajectoryData`.
