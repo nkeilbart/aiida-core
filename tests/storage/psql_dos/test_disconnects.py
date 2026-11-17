@@ -89,7 +89,7 @@ def test_query_error_is_preserved_when_rollback_and_logging_fail(backend, monkey
 
 
 def test_storage_release_continues_after_session_removal_failure():
-    """Release should still dispose the engine if session removal fails during rollback."""
+    """Release should preserve its factory for retry when session removal fails during rollback."""
     from unittest.mock import Mock
 
     from aiida.storage.psql_dos.backend import _PsqlDosResources
@@ -98,7 +98,7 @@ def test_storage_release_continues_after_session_removal_failure():
     factory = Mock()
     engine = Mock()
     factory.bind = engine
-    factory.remove.side_effect = original
+    factory.remove.side_effect = [original, None]
     resources = _PsqlDosResources()
     resources.session_factory = factory
 
@@ -109,8 +109,9 @@ def test_storage_release_continues_after_session_removal_failure():
     factory.expunge_all.assert_called_once_with()
     factory.remove.assert_called_once_with()
     engine.dispose.assert_called_once_with()
-    assert resources.session_factory is None
+    assert resources.session_factory is factory
 
     resources.release()
-    factory.remove.assert_called_once_with()
-    engine.dispose.assert_called_once_with()
+    assert factory.remove.call_count == 2
+    assert engine.dispose.call_count == 2
+    assert resources.session_factory is None

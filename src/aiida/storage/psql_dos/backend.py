@@ -85,7 +85,6 @@ class _PsqlDosResources:
             return
 
         session_factory = self.session_factory
-        self.session_factory = None
         error = None
 
         engine = session_factory.bind
@@ -104,6 +103,8 @@ class _PsqlDosResources:
 
         if error is not None:
             raise error
+
+        self.session_factory = None
 
     @property
     def has_pending_release(self) -> bool:
