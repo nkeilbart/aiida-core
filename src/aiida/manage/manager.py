@@ -199,12 +199,17 @@ class Manager:
 
     def reset_profile(self) -> None:
         """Close and reset any associated resources for the current profile."""
-        self.reset_broker()
-        self.reset_profile_storage()
-        self.reset_runner()
-
+        error = None
+        for reset in (self.reset_broker, self.reset_profile_storage, self.reset_runner):
+            try:
+                reset()
+            except Exception as exception:
+                if error is None:
+                    error = exception
         self._daemon_client = None
         self._persister = None
+        if error is not None:
+            raise error
 
     def reset_profile_storage(self) -> None:
         """Reset the profile storage.

@@ -33,8 +33,13 @@ async def shutdown_worker(runner: Runner) -> None:
 
     await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Close every open connection
-    get_manager().reset_profile()
+    # Close every open connection. Avoid ORM logging if a resource fails to close.
+    try:
+        get_manager().reset_profile()
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
 
     LOGGER.info('Daemon worker stopped')
 

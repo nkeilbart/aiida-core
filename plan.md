@@ -13,6 +13,17 @@ Improve AiiDA Core's resilience to PostgreSQL connection loss (including TLS EOF
 
 This plan does **not** promise exactly-once execution of arbitrary scheduler or plugin actions. If an action's outcome cannot be determined safely, AiiDA should expose an explicit recovery-required condition rather than silently repeat it.
 
+## HPC integration branch status
+
+- `postgres-disconnect-recovery-v294`: PR 1 session-cleanup fix, locally validated.
+- `postgres-pool-pre-ping-v294`: checkout pre-ping test/configuration point, locally validated.
+- `postgres-db-logging-fallback-v294`: ORM database-log failures remain on stderr without masking application errors.
+- `postgres-zeromq-async-tasks-v294`: async ZeroMQ task subscribers are awaited and settle tasks consistently.
+- `postgres-eof-integration-v294`: contains the session cleanup, pool pre-ping, and DB logging fallback changes for local/HPC testing.
+- Shutdown cleanup hardening is in progress on `postgres-continuation-preparation-v294`; continuation retry remains deferred because the initial lookup uses shared session state.
+- The ZeroMQ async-task attempt is excluded from integration after review found unsafe cancellation/redelivery cases; revisit only with broker-backed end-to-end tests.
+- No PRs are currently open for these changes. Keep the branches local until HPC validation and review are complete.
+
 ## Evidence and scope
 
 The report in [`postgres-tls-eof-investigation.md`](postgres-tls-eof-investigation.md) documents three distinct failure paths:
@@ -157,20 +168,20 @@ Each PR should be independently testable, documented, and include an accurate `U
 
 ### PR 2 — Logging and shutdown hardening
 
-- Prevent ORM logging-handler errors from replacing the original operational exception.
+- Prevent ORM logging-handler errors from replacing the original operational exception. (Implemented on local branch `postgres-db-logging-fallback-v294`.)
 - Add a non-recursive fallback logger.
 - Make worker cleanup best-effort, preserving the original failure and attempting remaining cleanup.
 - Test shutdown after a broken connection separately from active-operation EOF.
 
 ### PR 3 — Pool checkout resilience
 
-- Expose and validate `pool_pre_ping` through supported profile configuration; decide default based on maintainer feedback and measured overhead.
+- Expose and validate `pool_pre_ping` through supported profile configuration; decide default based on maintainer feedback and measured overhead. (Opt-in implementation and stale-connection test are on local branch `postgres-pool-pre-ping-v294`.)
 - Document pre-ping/recycle scope and limitations.
 - Test stale idle connection replacement.
 
 ### PR 4 — Owned reads and continuation preparation
 
-- Implement fresh-session materialized reads.
+- Implement fresh-session materialized reads. (Deferred: continuation reconstruction includes ORM references resolved through the shared backend session; no safe transfer boundary has been established.)
 - Cover full continuation preparation, not only its first lookup.
 - Add bounded retry for classified transient disconnects before process execution starts.
 - Verify another live process/session remains usable and process reconstruction occurs once.
@@ -192,7 +203,7 @@ Each PR should be independently testable, documented, and include an accurate `U
 
 ### PR 7 — Deferred task settlement and distributed ownership
 
-- Add explicit deferred storage failure semantics to RabbitMQ and ZeroMQ.
+- Add explicit deferred storage failure semantics to RabbitMQ and ZeroMQ. (ZeroMQ async task execution/settlement fixes are on local branch `postgres-zeromq-async-tasks-v294`; outage backoff and ownership fencing remain unimplemented.)
 - Add bounded outage backoff and distributed process claim/fencing.
 - Verify exhausted retries do not acknowledge unfinished work or create retry storms.
 - Verify old owners cannot continue durable work after losing the claim.

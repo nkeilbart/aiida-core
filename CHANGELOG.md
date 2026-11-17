@@ -5,6 +5,9 @@
 ### Fixes
 
 - Keep previously committed SQLAlchemy ORM entities attached to their session when a QueryBuilder operation fails, while rolling back the failed transaction.
+- Prevent database log-handler failures from escaping logging calls.
+- Continue attempting PostgreSQL session and engine cleanup if one resource-release step fails.
+- Continue daemon cleanup after individual resource-reset failures during shutdown.
 
 ### Improvements
 

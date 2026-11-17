@@ -8,6 +8,10 @@
 ###########################################################################
 """Unit tests for the :mod:`aiida.engine.daemon.worker` module."""
 
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
 
 from aiida.engine.daemon.worker import shutdown_worker
@@ -22,6 +26,18 @@ def test_shutdown_worker(manager):
     runner.loop.create_task(shutdown_worker(runner))
     runner.loop.run_forever()
     assert runner.is_closed()
+
+
+def test_shutdown_worker_contains_profile_cleanup_failure(monkeypatch):
+    """A storage close failure should not escape the daemon shutdown handler."""
+    from aiida.engine.daemon import worker
+
+    manager = SimpleNamespace(reset_profile=Mock(side_effect=RuntimeError('storage close failed')))
+    monkeypatch.setattr(worker, 'get_manager', lambda: manager)
+
+    asyncio.run(worker.shutdown_worker(Mock()))
+
+    manager.reset_profile.assert_called_once_with()
 
 
 @pytest.mark.usefixtures('aiida_profile_clean', 'started_daemon_client')

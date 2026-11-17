@@ -34,6 +34,31 @@ def test_disconnect():
     manager.reset_profile()  # This hangs before timing out
 
 
+def test_reset_profile_attempts_all_cleanup_after_failure(monkeypatch):
+    """A failure resetting one resource must not skip cleanup of later resources."""
+    from aiida.manage.manager import Manager
+
+    manager = Manager()
+    broker_reset = []
+    storage_reset = []
+    runner_reset = []
+
+    def fail_broker_reset():
+        broker_reset.append(True)
+        raise RuntimeError('broker close failed')
+
+    monkeypatch.setattr(manager, 'reset_broker', fail_broker_reset)
+    monkeypatch.setattr(manager, 'reset_profile_storage', lambda: storage_reset.append(True))
+    monkeypatch.setattr(manager, 'reset_runner', lambda: runner_reset.append(True))
+
+    with pytest.raises(RuntimeError, match='broker close failed'):
+        manager.reset_profile()
+
+    assert broker_reset == [True]
+    assert storage_reset == [True]
+    assert runner_reset == [True]
+
+
 def test_kernel_patch_not_applied_outside_notebook():
     """Test that ``_setup_event_loop_in_ipython`` does not patch when no event loop is running."""
     from ipykernel.ipkernel import IPythonKernel

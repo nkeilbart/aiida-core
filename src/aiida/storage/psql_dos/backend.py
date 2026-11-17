@@ -81,13 +81,29 @@ class _PsqlDosResources:
 
     def release(self) -> None:
         """Release the resources."""
-        if self.session_factory is not None:
-            engine = self.session_factory.bind
-            if engine is not None:
-                engine.dispose()  # type: ignore[union-attr]
-            self.session_factory.expunge_all()
-            self.session_factory.remove()
-            self.session_factory = None
+        if self.session_factory is None:
+            return
+
+        session_factory = self.session_factory
+        self.session_factory = None
+        error = None
+
+        engine = session_factory.bind
+        for release in (
+            session_factory.expunge_all,
+            session_factory.remove,
+            engine.dispose if engine is not None else None,
+        ):
+            if release is None:
+                continue
+            try:
+                release()
+            except Exception as exception:
+                if error is None:
+                    error = exception
+
+        if error is not None:
+            raise error
 
     @property
     def has_pending_release(self) -> bool:
