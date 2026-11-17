@@ -20,7 +20,7 @@ This plan does **not** promise exactly-once execution of arbitrary scheduler or 
 - `postgres-db-logging-fallback-v294`: ORM database-log failures remain on stderr without masking application errors.
 - `postgres-zeromq-async-tasks-v294`: async ZeroMQ task subscribers are awaited and settle tasks consistently.
 - `postgres-eof-integration-v294`: contains the session cleanup, pool pre-ping, and DB logging fallback changes for local/HPC testing.
-- Shutdown cleanup hardening is in progress on `postgres-continuation-preparation-v294`; continuation retry remains deferred because the initial lookup uses shared session state.
+- Shutdown cleanup hardening is included in `postgres-eof-integration-v294` (commit `86b981cdc`); continuation retry remains deferred because the initial lookup uses shared session state.
 - The ZeroMQ async-task attempt is excluded from integration after review found unsafe cancellation/redelivery cases; revisit only with broker-backed end-to-end tests.
 - No PRs are currently open for these changes. Keep the branches local until HPC validation and review are complete.
 
@@ -30,7 +30,7 @@ The report in [`postgres-tls-eof-investigation.md`](postgres-tls-eof-investigati
 
 1. **Oct 20 and Oct 27, 2026 — continuation lookup:** `ProcessLauncher._continue()` fails in `load_node(pk=pid)` while QueryBuilder is establishing a SQLAlchemy SAVEPOINT, before process reconstruction or checkpoint handling. QueryBuilder cleanup closes the shared session. The broker's ordinary exception path normally acknowledges the task.
 2. **Oct 21, 2026 — cancellation:** a live process fails reading `db_dbnode.attributes`; ORM logging then fails on the unusable SQLAlchemy transaction and masks the intended cancellation error handling.
-3. **Shutdown:** EOF occurs during rollback/resource cleanup, after shutdown has begun; these traces do not identify the trigger for shutdown.
+3. **Shutdown:** EOF occurs during rollback/resource cleanup, after shutdown has begun; these traces do not identify the trigger for shutdown. Cleanup now attempts scoped-session removal and engine disposal even when an earlier cleanup step raises, and daemon resource resets are best-effort.
 
 The daemon uses a thread-scoped SQLAlchemy session. Closing/removing or rolling back that session can affect other live processes in the same worker. A checkpoint-only retry does not cover the documented initial lookup failure. The investigation could not determine `DBAPIError.connection_invalidated`; matching the EOF message is not a sufficient retry classifier.
 
