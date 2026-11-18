@@ -21,8 +21,14 @@ This plan does **not** promise exactly-once execution of arbitrary scheduler or 
 - `postgres-zeromq-async-tasks-v294`: async ZeroMQ task subscribers are awaited and settle tasks consistently.
 - `postgres-eof-integration-v294`: contains the session cleanup, pool pre-ping, and DB logging fallback changes for local/HPC testing.
 - Shutdown cleanup hardening is included in `postgres-eof-integration-v294` (commit `86b981cdc`); continuation retry remains deferred because the initial lookup uses shared session state.
+- CalcJob cancellation error reporting is fixed on `postgres-cancellation-eof-hardening-v294` (commit `9ac28ee6f`) and included in the integration branch (commit `6affc72a5`). A real disconnect regression test confirms that the module logger preserves the original failure.
+- A fresh-session retry of only the cancellation-state read was prototyped and rejected: cancellation immediately performs more reads and a scheduler-state write through the failed shared session. Do not reinstate that partial retry; first define an ownership boundary for the full cancellation operation.
 - The ZeroMQ async-task attempt is excluded from integration after review found unsafe cancellation/redelivery cases; revisit only with broker-backed end-to-end tests.
-- No PRs are currently open for these changes. Keep the branches local until HPC validation and review are complete.
+- No PRs are currently open for these changes. Keep the integration branch local until HPC validation and review are complete.
+
+### Immediate next implementation
+
+Complete **PR 1 — Fault-injection tests and diagnostics** before attempting more recovery logic. Extend the real PostgreSQL cancellation disconnect test to assert the actual SQLAlchemy exception type and `connection_invalidated` value, then add the missing phase-focused diagnostics/tests for flush, commit acknowledgment, rollback, and close. Keep tests isolated from shared-session cleanup side effects. This will establish which failure classes are safe candidates for owned-operation retries and prevent guessing from EOF text alone.
 
 ## Evidence and scope
 
