@@ -518,6 +518,89 @@ class TestCalcJob:
 
         return process
 
+    def test_kill_returns_false_when_scheduler_state_read_fails(self, monkeypatch, caplog, aiida_localhost):
+        """A database failure reading CalcJob state is reported without breaking cancellation handling."""
+        from sqlalchemy.exc import OperationalError
+
+        self.computer = aiida_localhost
+        process = self.instantiate_process()
+        exception = OperationalError('SELECT db_dbnode.attributes', {}, OSError('database connection lost'))
+        exception.connection_invalidated = True
+        node_logger = process.node.logger
+
+        def fail_node_logger(*args, **kwargs):
+            raise AssertionError('cancellation failure should not be reported through the node logger')
+
+        monkeypatch.setattr(node_logger, 'error', fail_node_logger)
+
+        def fail_scheduler_task(coro):
+            coro.close()
+            future = process.loop.create_future()
+            future.set_exception(exception)
+            return future
+
+        monkeypatch.setattr('aiida.engine.processes.process.asyncio.create_task', fail_scheduler_task)
+        monkeypatch.setattr('aiida.engine.processes.process.run_until_complete', lambda loop, future: future.result())
+
+        assert process.kill(force_kill=False) is False
+        assert 'While cancelling the scheduler job' in caplog.text
+        assert 'database connection lost' in caplog.text
+        records = [record for record in caplog.records if 'While cancelling the scheduler job' in record.message]
+        assert len(records) == 1
+        assert records[0].name == 'aiida.engine.processes.process'
+        assert records[0].exc_info is not None
+        assert records[0].exc_info[1] is exception
+
+    @pytest.mark.requires_psql
+    def test_kill_does_not_mask_state_read_disconnect(self, monkeypatch, aiida_localhost, caplog):
+        """A real PostgreSQL disconnect during the cancellation state read remains visible and returns False."""
+        import psycopg
+        from sqlalchemy import event
+
+        self.computer = aiida_localhost
+        process = self.instantiate_process()
+        backend = process.node.backend
+        session = backend.get_session()
+        model = process.node.backend_entity._model._model
+        session.expire(model, ['attributes'])
+        engine = session.get_bind()
+        config = backend.profile.storage_config
+
+        def terminate_on_attribute_read(conn, cursor, statement, parameters, context, executemany):
+            if statement.startswith('SELECT db_dbnode.attributes'):
+                backend_pid = conn.connection.driver_connection.info.backend_pid
+                with psycopg.connect(
+                    host=config['database_hostname'],
+                    port=config['database_port'],
+                    dbname=config['database_name'],
+                    user=config['database_username'],
+                    password=config['database_password'],
+                    autocommit=True,
+                ) as admin_conn:
+                    assert admin_conn.execute('SELECT pg_terminate_backend(%s)', (backend_pid,)).fetchone()[0]
+
+        def run_scheduler_task(coro):
+            future = process.loop.create_future()
+            try:
+                future.set_result(process.loop.run_until_complete(coro))
+            except Exception as exception:
+                future.set_exception(exception)
+            return future
+
+        monkeypatch.setattr('aiida.engine.processes.process.asyncio.create_task', run_scheduler_task)
+        event.listen(engine, 'before_cursor_execute', terminate_on_attribute_read)
+        try:
+            assert process.kill() is False
+        finally:
+            event.remove(engine, 'before_cursor_execute', terminate_on_attribute_read)
+            session.rollback()
+
+        records = [record for record in caplog.records if 'While cancelling the scheduler job' in record.message]
+        assert len(records) == 1
+        assert records[0].name == 'aiida.engine.processes.process'
+        assert records[0].exc_info is not None
+        assert 'connection' in str(records[0].exc_info[1]).lower()
+
     def test_get_hash(self, get_calcjob_builder):
         """Test that :meth:`aiida.orm.CalcJobNode.get_hash` returns the same hash as what is stored in the extras."""
         builder = get_calcjob_builder()

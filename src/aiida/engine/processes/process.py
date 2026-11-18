@@ -54,6 +54,8 @@ from .ports import PORT_NAMESPACE_SEPARATOR, InputPort, OutputPort, PortNamespac
 from .process_spec import ProcessSpec
 from .utils import prune_mapping
 
+LOGGER = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from aiida.engine.runners import Runner
 
@@ -355,7 +357,12 @@ class Process(PlumpyProcess):
             try:
                 run_until_complete(self.loop, self._cancelling_scheduler_job)
             except Exception as exc:
-                self.node.logger.error(f'While cancelling the scheduler job an error was raised: {exc}')
+                LOGGER.error(
+                    'While cancelling the scheduler job for Process<%d> an error was raised: %s',
+                    self.node.pk,
+                    exc,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
                 return False
 
         result = super().kill(msg_text, force_kill)

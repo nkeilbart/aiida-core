@@ -8,6 +8,7 @@
 - Prevent database log-handler failures from escaping logging calls.
 - Continue attempting PostgreSQL session and engine cleanup if one resource-release step fails.
 - Continue daemon cleanup after individual resource-reset failures during shutdown.
+- Report scheduler-cancellation read failures through the module logger rather than the failed node-backed database logger.
 
 ### Improvements
 
